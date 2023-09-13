@@ -49,47 +49,46 @@ For training, we use [PyTorch Lightning](https://lightning.ai/docs/pytorch/stabl
 ## Installation:
 <a name="installation"></a>
 
-#### 1. Clone the repo
+#### Clone the repo
 
 ```shell
-git clone git@github.com:Stability-AI/generative-models.git
-cd generative-models
+git clone https://github.com/aime-labs/stable_diffusion_xl
+
 ```
 
-#### 2. Setting up the virtualenv
-
-This is assuming you have navigated to the `generative-models` root after cloning it.
-
-**NOTE:** This is tested under `python3.8` and `python3.10`. For other python versions, you might encounter version conflicts.
-
-
-**PyTorch 1.13**
-
+#### Setting up AIME MLC
 ```shell
-# install required packages from pypi
-python3 -m venv .pt13
-source .pt13/bin/activate
-pip3 install -r requirements/pt13.txt
+mlc-create sdxl Pytorch 2.0.1-aime
 ```
-
-**PyTorch 2.0**
-
-
+#### Install packages in AIME MLC
 ```shell
-# install required packages from pypi
-python3 -m venv .pt2
-source .pt2/bin/activate
+mlc-open sdxl
+sudo apt-get install libglib2.0-0 libgl1
+cd stable_diffusion_xl
 pip3 install -r requirements/pt2.txt
+pip install .
+
 ```
-
-
-#### 3. Install `sgm`
-
+#### Setup weigths
 ```shell
-pip3 install .
+sudo apt-get install git-lfs
+git lfs install
+mkdir checkpoints
+cd checkpoints
+git clone https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0
+git clone https://huggingface.co/stabilityai/stable-diffusion-xl-refiner-1.0
 ```
-
-#### 4. Install `sdata` for training
+### Run inference demo in AIME MLC
+```shell
+mlc-open sdxl
+cd stable_diffusion_xl
+streamlit run sampling.py
+```
+If command streamlit not found, run:
+```shell
+export PATH="$HOME/.local/bin:$PATH"
+```
+#### Install `sdata` for training
 
 ```shell
 pip3 install -e git+https://github.com/Stability-AI/datapipelines.git@main#egg=sdata

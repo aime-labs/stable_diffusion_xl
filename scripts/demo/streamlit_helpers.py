@@ -104,10 +104,11 @@ def set_lowvram_mode(mode):
 
 def initial_model_load(model):
     global lowvram_mode
-    if lowvram_mode:
-        model.model.half()
-    else:
-        model.cuda()
+    model.model.half()
+    #if lowvram_mode:
+    #    model.model.half()
+    #else:
+    #    model.cuda()
     return model
 
 

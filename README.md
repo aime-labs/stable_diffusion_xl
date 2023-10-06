@@ -65,8 +65,7 @@ mlc-create sdxl Pytorch 2.0.1-aime
 mlc-open sdxl
 sudo apt-get install libglib2.0-0 libgl1
 cd stable_diffusion_xl
-pip3 install -r requirements/pt2.txt
-pip install .
+pip3 install -r requirements.txt
 
 ```
 #### Setup weigths

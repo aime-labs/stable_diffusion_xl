@@ -16,39 +16,42 @@ class ProcessOutputCallback():
         self.local_rank = local_rank
         self.api_worker = api_worker
         self.job_data = None
-        self.current_step = 0
 
     def process_output(self, output, finished):
         if self.local_rank == 0:
-            images = torch.clamp((output.pop('image') + 1.0) / 2.0, min=0.0, max=1.0)
-            if finished:
-                images = embed_watermark(images)
-
             list_images = list()
-            for sample in images:
-                sample = 255. * rearrange(sample.cpu().numpy(), 'c h w -> h w c')
-                list_images.append(Image.fromarray(sample.astype(np.uint8)))
+            if not 'Error' in output['info']:
+                images = torch.clamp((output.pop('image') + 1.0) / 2.0, min=0.0, max=1.0)
+                
+                for image in images:
+                    image = 255. * rearrange(image.cpu().numpy(), 'c h w -> h w c')
+                    list_images.append(Image.fromarray(image.astype(np.uint8)))
+
+                if finished:
+                    images = embed_watermark(images)
+            else:
+                images = output.pop('image')
+                for image in images:
+                    list_images.append(Image.fromarray(image.astype(np.uint8)))
 
             if finished:
-                output['image'] = list_images[0]
+                output['image'] = list_images
                 self.api_worker.send_progress(self.job_data, 100, None)
                 return self.api_worker.send_job_results(self.job_data, output)
             else:
-                output['progress_data'] = list_images[0]
+                output['progress_data'] = list_images
                 total_steps = self.job_data['base_steps'] + max(int(self.job_data['img2img_strength'] * self.job_data['refine_steps']), 1) + 1
                 if output['stage'] == 'base':
                     progress = output['progress']*100/ total_steps
                 else:
-                    progress = (output['progress']+self.job_data['base_steps'])*100/ total_steps
+                    progress = (output['progress'] + self.job_data['base_steps'])*100/ total_steps
                 
                 return self.api_worker.send_progress(self.job_data, progress, output)
 
 def load_flags():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--api_server",
-        type=str,
-        default="http://0.0.0.0:7777",
+        "--api_server", type=str, default="http://0.0.0.0:7777",
         help="Address of the API server",
     )
     parser.add_argument(
@@ -56,13 +59,11 @@ def load_flags():
         help="ID of the GPU to be used"
     )
     parser.add_argument(
-        "--use_fp16",
-        action='store_true',
+        "--use_fp16", action='store_true',
         help="Use model in half precision"
     )
     parser.add_argument(
-        "--compile",
-        action='store_true',
+        "--compile", action='store_true',
         help="Use torch.compile(model) from Pytorch 2"
     )
 
@@ -109,7 +110,7 @@ def main():
                         params = params_base,
                         prompt = job_data['text'],
                         negative_prompt = job_data.get('negative_prompt',''),
-                        samples = 1,
+                        samples = job_data['num_samples'],
                         return_latents = True,
                         progress_callback = callback.process_output
                     )
@@ -120,14 +121,17 @@ def main():
                         image = samples_z,
                         prompt = job_data['text'],
                         negative_prompt = job_data.get('negative_prompt',''),
-                        samples = 1,
+                        samples = job_data['num_samples'],
                         progress_callback = callback.process_output
                     )
             
             callback.process_output({'image': samples, 'info': f'Prompt: {job_data["text"]}'}, True)
 
-        except (RuntimeError, ValueError) as exc:
-            callback.process_output({'image': np.random.rand(1024,1024,3) * 255, 'info': exc}, True)
+        except ValueError as exc:
+            callback.process_output({'image': [np.random.rand(1024,1024,3) * 255], 'info': f'Error: {exc}\nChange parameters and try again'}, True)
+            continue
+        except torch.cuda.OutOfMemoryError as exc:
+            callback.process_output({'image': [np.random.rand(1024,1024,3) * 255], 'info': f'Error: {exc}\nReduce num_samples and try again'}, True)
             continue
         
 

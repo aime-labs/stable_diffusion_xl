@@ -2,10 +2,11 @@ from dataclasses import dataclass, asdict
 from enum import Enum
 from omegaconf import OmegaConf
 import pathlib
+import torch
 from sgm.inference.helpers import (
     do_sample,
     do_img2img,
-    Img2ImgDiscretizationWrapper,
+    Img2ImgDiscretizationWrapper
 )
 from sgm.modules.diffusionmodules.sampling import (
     EulerEDMSampler,
@@ -139,7 +140,7 @@ model_specs = {
         factor=8,
         is_legacy=False,
         config="sd_xl_base.yaml",
-        ckpt="sd_xl_base_1.0.safetensors",
+        ckpt="stable-diffusion-xl-base-1.0/sd_xl_base_1.0.safetensors",
         is_guided=True,
     ),
     ModelArchitecture.SDXL_V1_REFINER: SamplingSpec(
@@ -149,7 +150,7 @@ model_specs = {
         factor=8,
         is_legacy=True,
         config="sd_xl_refiner.yaml",
-        ckpt="sd_xl_refiner_1.0.safetensors",
+        ckpt="stable-diffusion-xl-refiner-1.0/sd_xl_refiner_1.0.safetensors",
         is_guided=True,
     ),
 }
@@ -163,6 +164,7 @@ class SamplingPipeline:
         config_path="configs/inference",
         device="cuda",
         use_fp16=True,
+        compile=True
     ) -> None:
         if model_id not in model_specs:
             raise ValueError(f"Model {model_id} not supported")
@@ -171,9 +173,9 @@ class SamplingPipeline:
         self.config = str(pathlib.Path(config_path, self.specs.config))
         self.ckpt = str(pathlib.Path(model_path, self.specs.ckpt))
         self.device = device
-        self.model = self._load_model(device=device, use_fp16=use_fp16)
+        self.model = self._load_model(device=device, use_fp16=use_fp16, compile=compile)
 
-    def _load_model(self, device="cuda", use_fp16=True):
+    def _load_model(self, device="cuda", use_fp16=True, compile=True):
         config = OmegaConf.load(self.config)
         model = load_model_from_config(config, self.ckpt)
         if model is None:
@@ -182,6 +184,8 @@ class SamplingPipeline:
         if use_fp16:
             model.conditioner.half()
             model.model.half()
+        if compile:
+            model = torch.compile(model)
         return model
 
     def text_to_image(
@@ -191,8 +195,9 @@ class SamplingPipeline:
         negative_prompt: str = "",
         samples: int = 1,
         return_latents: bool = False,
+        progress_callback = None
     ):
-        sampler = get_sampler_config(params)
+        sampler = get_sampler_config(params, progress_callback, 'base')
         value_dict = asdict(params)
         value_dict["prompt"] = prompt
         value_dict["negative_prompt"] = negative_prompt
@@ -220,8 +225,9 @@ class SamplingPipeline:
         negative_prompt: str = "",
         samples: int = 1,
         return_latents: bool = False,
+        progress_callback = None,
     ):
-        sampler = get_sampler_config(params)
+        sampler = get_sampler_config(params, progress_callback, 'base')
 
         if params.img2img_strength < 1.0:
             sampler.discretization = Img2ImgDiscretizationWrapper(
@@ -253,8 +259,14 @@ class SamplingPipeline:
         negative_prompt: Optional[str] = None,
         samples: int = 1,
         return_latents: bool = False,
+        progress_callback = None,
     ):
-        sampler = get_sampler_config(params)
+        sampler = get_sampler_config(params, progress_callback, 'refine')
+        if params.img2img_strength < 1.0:
+            sampler.discretization = Img2ImgDiscretizationWrapper(
+                sampler.discretization,
+                strength=params.img2img_strength,
+            )
         value_dict = {
             "orig_width": image.shape[3] * 8,
             "orig_height": image.shape[2] * 8,
@@ -262,10 +274,10 @@ class SamplingPipeline:
             "target_height": image.shape[2] * 8,
             "prompt": prompt,
             "negative_prompt": negative_prompt,
-            "crop_coords_top": 0,
-            "crop_coords_left": 0,
-            "aesthetic_score": 6.0,
-            "negative_aesthetic_score": 2.5,
+            "crop_coords_top": params.crop_coords_top,
+            "crop_coords_left": params.crop_coords_left,
+            "aesthetic_score": params.aesthetic_score,
+            "negative_aesthetic_score": params.negative_aesthetic_score,
         }
 
         return do_img2img(
@@ -325,7 +337,7 @@ def get_discretization_config(params: SamplingParams):
     return discretization_config
 
 
-def get_sampler_config(params: SamplingParams):
+def get_sampler_config(params: SamplingParams, progress_callback=None, stage='base'):
     discretization_config = get_discretization_config(params)
     guider_config = get_guider_config(params)
     sampler = None
@@ -339,6 +351,8 @@ def get_sampler_config(params: SamplingParams):
             s_tmax=params.s_tmax,
             s_noise=params.s_noise,
             verbose=True,
+            progress_callback=progress_callback,
+            stage=stage
         )
     if params.sampler == Sampler.HEUN_EDM:
         return HeunEDMSampler(
@@ -350,6 +364,8 @@ def get_sampler_config(params: SamplingParams):
             s_tmax=params.s_tmax,
             s_noise=params.s_noise,
             verbose=True,
+            progress_callback=progress_callback,
+            stage=stage
         )
     if params.sampler == Sampler.EULER_ANCESTRAL:
         return EulerAncestralSampler(
@@ -359,6 +375,8 @@ def get_sampler_config(params: SamplingParams):
             eta=params.eta,
             s_noise=params.s_noise,
             verbose=True,
+            progress_callback=progress_callback,
+            stage=stage
         )
     if params.sampler == Sampler.DPMPP2S_ANCESTRAL:
         return DPMPP2SAncestralSampler(
@@ -367,7 +385,9 @@ def get_sampler_config(params: SamplingParams):
             guider_config=guider_config,
             eta=params.eta,
             s_noise=params.s_noise,
-            verbose=True,
+            verbose=True,            
+            progress_callback=progress_callback,
+            stage=stage
         )
     if params.sampler == Sampler.DPMPP2M:
         return DPMPP2MSampler(
@@ -375,6 +395,8 @@ def get_sampler_config(params: SamplingParams):
             discretization_config=discretization_config,
             guider_config=guider_config,
             verbose=True,
+            progress_callback=progress_callback,
+            stage=stage
         )
     if params.sampler == Sampler.LINEAR_MULTISTEP:
         return LinearMultistepSampler(
@@ -383,6 +405,8 @@ def get_sampler_config(params: SamplingParams):
             guider_config=guider_config,
             order=params.order,
             verbose=True,
+            progress_callback=progress_callback,
+            stage=stage
         )
 
     raise ValueError(f"unknown sampler {params.sampler}!")

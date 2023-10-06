@@ -21,6 +21,7 @@ from ...util import append_dims, default, instantiate_from_config
 DEFAULT_GUIDER = {"target": "sgm.modules.diffusionmodules.guiders.IdentityGuider"}
 
 
+
 class BaseDiffusionSampler:
     def __init__(
         self,
@@ -29,6 +30,8 @@ class BaseDiffusionSampler:
         guider_config: Union[Dict, ListConfig, OmegaConf, None] = None,
         verbose: bool = False,
         device: str = "cuda",
+        progress_callback = None,
+        stage = 'base'
     ):
         self.num_steps = num_steps
         self.discretization = instantiate_from_config(discretization_config)
@@ -40,6 +43,8 @@ class BaseDiffusionSampler:
         )
         self.verbose = verbose
         self.device = device
+        self.progress_callback = progress_callback
+        self.stage = stage
 
     def prepare_sampling_loop(self, x, cond, uc=None, num_steps=None):
         sigmas = self.discretization(
@@ -72,6 +77,11 @@ class BaseDiffusionSampler:
                 desc=f"Sampling with {self.__class__.__name__} for {num_sigmas} steps",
             )
         return sigma_generator
+
+    def send_progress(self, step, output):
+        self.progress_callback({'image': output, 'info': 'processing', 'progress': step, 'stage': self.stage}, False)
+
+
 
 
 class SingleStepDiffusionSampler(BaseDiffusionSampler):
@@ -107,13 +117,14 @@ class EDMSampler(SingleStepDiffusionSampler):
         x = self.possible_correction_step(
             euler_step, x, d, dt, next_sigma, denoiser, cond, uc
         )
+
+
         return x
 
     def __call__(self, denoiser, x, cond, uc=None, num_steps=None):
         x, s_in, sigmas, num_sigmas, cond, uc = self.prepare_sampling_loop(
             x, cond, uc, num_steps
         )
-
         for i in self.get_sigma_gen(num_sigmas):
             gamma = (
                 min(self.s_churn / (num_sigmas - 1), 2**0.5 - 1)
@@ -129,6 +140,8 @@ class EDMSampler(SingleStepDiffusionSampler):
                 uc,
                 gamma,
             )
+            
+            self.send_progress(i, x)
 
         return x
 
@@ -169,7 +182,7 @@ class AncestralSampler(SingleStepDiffusionSampler):
                 cond,
                 uc,
             )
-
+            self.send_progress(i, x)
         return x
 
 
@@ -207,6 +220,7 @@ class LinearMultistepSampler(BaseDiffusionSampler):
                 for j in range(cur_order)
             ]
             x = x + sum(coeff * d for coeff, d in zip(coeffs, reversed(ds)))
+            self.send_progress(i, x)
 
         return x
 
@@ -243,6 +257,7 @@ class EulerAncestralSampler(AncestralSampler):
         denoised = self.denoise(x, denoiser, sigma, cond, uc)
         x = self.ancestral_euler_step(x, denoised, sigma, sigma_down)
         x = self.ancestral_step(x, sigma, next_sigma, sigma_up)
+
 
         return x
 
@@ -361,5 +376,7 @@ class DPMPP2MSampler(BaseDiffusionSampler):
                 cond,
                 uc=uc,
             )
+
+            self.send_progress(i, x)
 
         return x

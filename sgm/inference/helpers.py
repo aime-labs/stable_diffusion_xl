@@ -159,8 +159,8 @@ def do_sample(
                     )
 
                 samples_z = sampler(denoiser, randn, cond=c, uc=uc)
-                samples_x = model.decode_first_stage(samples_z)
-                samples = torch.clamp((samples_x + 1.0) / 2.0, min=0.0, max=1.0)
+                samples = model.decode_first_stage(samples_z)
+                #samples = torch.clamp((samples + 1.0) / 2.0, min=0.0, max=1.0)
 
                 if filter is not None:
                     samples = filter(samples)
@@ -294,8 +294,8 @@ def do_img2img(
                     return model.denoiser(model.model, x, sigma, c)
 
                 samples_z = sampler(denoiser, noised_z, cond=c, uc=uc)
-                samples_x = model.decode_first_stage(samples_z)
-                samples = torch.clamp((samples_x + 1.0) / 2.0, min=0.0, max=1.0)
+                samples = model.decode_first_stage(samples_z)
+                #samples = torch.clamp((samples + 1.0) / 2.0, min=0.0, max=1.0)
 
                 if filter is not None:
                     samples = filter(samples)

@@ -86,7 +86,16 @@ streamlit run sampling.py
 If command streamlit not found, run:
 ```shell
 export PATH="$HOME/.local/bin:$PATH"
+
 ```
+
+### Run txt2img inference in AIME MLC with AIME_ML_API
+```shell
+mlc-open sdxl
+cd stable_diffusion_xl
+python3 run_txt2img.py
+```
+
 #### Install `sdata` for training
 
 ```shell

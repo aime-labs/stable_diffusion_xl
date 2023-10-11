@@ -79,7 +79,7 @@ class BaseDiffusionSampler:
         return sigma_generator
 
     def send_progress(self, step, output):
-        self.progress_callback({'image': output, 'info': 'processing', 'progress': step, 'stage': self.stage}, False)
+        self.progress_callback({'images': output, 'info': 'processing', 'progress': step, 'stage': self.stage}, False)
 
 
 

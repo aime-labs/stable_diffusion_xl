@@ -158,15 +158,15 @@ def do_sample(
                         model.model, input, sigma, c, **additional_model_inputs
                     )
 
-                samples_z = sampler(denoiser, randn, cond=c, uc=uc)
-                samples = model.decode_first_stage(samples_z)
+                samples = sampler(denoiser, randn, cond=c, uc=uc)
+                #samples = model.decode_first_stage(samples_z)
                 #samples = torch.clamp((samples + 1.0) / 2.0, min=0.0, max=1.0)
 
-                if filter is not None:
-                    samples = filter(samples)
+                #if filter is not None:
+                #    samples = filter(samples)
 
-                if return_latents:
-                    return samples, samples_z
+                #if return_latents:
+                #    return samples, samples_z
                 return samples
 
 
@@ -293,13 +293,13 @@ def do_img2img(
                 def denoiser(x, sigma, c):
                     return model.denoiser(model.model, x, sigma, c)
 
-                samples_z = sampler(denoiser, noised_z, cond=c, uc=uc)
-                samples = model.decode_first_stage(samples_z)
+                samples = sampler(denoiser, noised_z, cond=c, uc=uc)
+                #samples = model.decode_first_stage(samples_z)
                 #samples = torch.clamp((samples + 1.0) / 2.0, min=0.0, max=1.0)
 
-                if filter is not None:
-                    samples = filter(samples)
+                #if filter is not None:
+                #    samples = filter(samples)
 
-                if return_latents:
-                    return samples, samples_z
+                #if return_latents:
+                #    return samples, samples_z
                 return samples

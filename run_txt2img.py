@@ -6,6 +6,7 @@ from einops import rearrange
 import argparse
 from PIL import Image
 import numpy as np
+import sys
 from api_worker_interface import APIWorkerInterface, ProgressCallback
 
 WORKER_JOB_TYPE = "stable_diffusion_xl_txt2img"
@@ -78,13 +79,15 @@ def load_flags():
                         )
     return parser.parse_args()
 
-def set_seed(seed):
+def set_seed(job_data):
+    seed = job_data.get('seed', 1234)
     if seed == -1:
-        seed = random.randint(0,10000)
+        seed = random.randint(1, 99999999)
+        job_data['seed'] = seed
     torch.manual_seed(seed)
     random.seed(seed)
     np.random.seed(seed)
-    return seed
+    return job_data
 
 
 def get_sampling_parameters(job_data, stage):
@@ -105,29 +108,26 @@ def main():
     while True:
         try:
             job_data = api_worker.job_request()
-            seed = set_seed(job_data.get('seed', 1234))
+            job_data = set_seed(job_data)
             callback.job_data = job_data           
-            params_base = get_sampling_parameters(job_data, 'base')
-            params_refine = get_sampling_parameters(job_data, 'refine')
-            prompt = job_data['text']
             
             samples = pipeline_base.text_to_image(
-                        params = params_base,
-                        prompt = prompt,
+                        params = get_sampling_parameters(job_data, 'base'),
+                        prompt = job_data['prompt'],
                         negative_prompt = job_data['negative_prompt'],
                         samples = job_data['num_samples'],
                         progress_callback = callback.process_output
                     )          
             samples = pipeline_refiner.refiner(
-                        params = params_refine,
+                        params = get_sampling_parameters(job_data, 'refine'),
                         image = samples,
-                        prompt = prompt,
+                        prompt = job_data['prompt'],
                         negative_prompt = job_data['negative_prompt'],
                         samples = job_data['num_samples'],
                         progress_callback = callback.process_output
                     )
             
-            callback.process_output({'images': samples, 'info': f'Prompt: {job_data["text"]}\nSeed: {seed}'}, True)
+            callback.process_output({'images': samples, 'info': f'Prompt: {job_data['prompt']}\nSeed: {job_data['seed']}'}, True)
 
         except ValueError as exc:
             callback.process_output({'info': f'{exc}\nChange parameters and try again'}, True)

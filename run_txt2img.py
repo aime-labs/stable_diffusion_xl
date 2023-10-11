@@ -23,7 +23,8 @@ class ProcessOutputCallback():
     def process_output(self, output, finished):
         list_images = list()
         if output.get('images') is None:
-            list_images.append(Image.fromarray((np.random.rand(1024,1024,3) * 255).astype(np.uint8)))
+            output['images'] = [Image.fromarray((np.random.rand(1024,1024,3) * 255).astype(np.uint8))]
+            return self.api_worker.send_job_results(self.job_data, output)
         else:
             images = output.pop('images')
             if not finished:
@@ -127,13 +128,14 @@ def main():
                         progress_callback = callback.process_output
                     )
             
-            callback.process_output({'images': samples, 'info': f'Prompt: {job_data['prompt']}\nSeed: {job_data['seed']}'}, True)
+            callback.process_output({'images': samples}, True)
 
         except ValueError as exc:
-            callback.process_output({'info': f'{exc}\nChange parameters and try again'}, True)
+            callback.process_output({'error': f'{exc}\nChange parameters and try again'}, True)
             continue
         except torch.cuda.OutOfMemoryError as exc:
-            callback.process_output({'info': f'{exc}\nReduce num_samples and try again'}, True)
+            print('OOM')
+            callback.process_output({'error': f'{exc}\nReduce num_samples and try again'}, True)
             continue
         
 

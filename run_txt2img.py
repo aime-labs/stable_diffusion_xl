@@ -1,11 +1,12 @@
-from sgm.inference.api import model_specs, SamplingParams, SamplingPipeline, Sampler, ModelArchitecture, Discretization, Guider
+from sgm.inference.api import SamplingParams, SamplingPipeline, ModelArchitecture
 from sgm.inference.helpers import embed_watermark
 import torch
 import random
 from einops import rearrange
 import argparse
-from PIL import Image
+from PIL import Image, ExifTags
 import numpy as np
+import math
 import sys
 from api_worker_interface import APIWorkerInterface, ProgressCallback
 
@@ -16,8 +17,10 @@ WORKER_AUTH_KEY = "5b07e305b50505ca2b3284b4ae5f65d7"
 class ProcessOutputCallback():
     def __init__(self, api_worker, decode_first_stage):
         self.api_worker = api_worker
-        self.job_data = None
         self.decode_first_stage = decode_first_stage
+        self.job_data = None
+        self.total_steps = None
+        self.current_step = None
 
 
     def process_output(self, output, finished):
@@ -29,39 +32,58 @@ class ProcessOutputCallback():
             images = output.pop('images')
             if not finished:
                 progress = self.calculate_progress(output)
-                if self.job_data.get('provide_progress_images') == 'None':
+                preview_steps = self.get_preview_steps()
+                if self.job_data.get('provide_progress_images') == 'None' or self.current_step not in preview_steps:
                     return self.api_worker.send_progress(self.job_data, progress, None)
 
                 elif self.job_data.get('provide_progress_images') == 'decoded':
                     images = self.decode_first_stage(images)
 
                 images = torch.clamp((images + 1.0) / 2.0, min=0.0, max=1.0)
-                for image in images:
-                    image = 255. * rearrange(image.cpu().numpy(), 'c h w -> h w c')
-                    list_images.append(Image.fromarray(image.astype(np.uint8)))
 
-                output['progress_images'] = list_images
+                image_list = self.get_image_list(images)
+                output['progress_images'] = image_list
                 return self.api_worker.send_progress(self.job_data, progress, output)
 
             else:
                 images = self.decode_first_stage(images)
                 images = torch.clamp((images + 1.0) / 2.0, min=0.0, max=1.0)
                 images = embed_watermark(images)
-                for image in images:
-                    image = 255. * rearrange(image.cpu().numpy(), 'c h w -> h w c')
-                    list_images.append(Image.fromarray(image.astype(np.uint8)))
+                image_list = self.get_image_list(images)
 
-                output['images'] = list_images
+                output['images'] = image_list
                 self.api_worker.send_progress(self.job_data, 100, None)
                 return self.api_worker.send_job_results(self.job_data, output)
 
+    def get_image_list(self, images):
+        image_list = list()
+        for image in images:
+            image = 255. * rearrange(image.cpu().numpy(), 'c h w -> h w c')
+            image = Image.fromarray(image.astype(np.uint8))
+            image_list.append(image)
+        return image_list
+
+
 
     def calculate_progress(self, output):
-        total_steps = self.job_data['base_steps'] + max(int(self.job_data['img2img_strength'] * self.job_data['refine_steps']), 1) + 1
+        self.total_steps = self.job_data['base_steps'] + max(int(self.job_data['img2img_strength'] * self.job_data['refine_steps']), 1) + 1
         if output['stage'] == 'base':
-            return round(output['progress']*100/ total_steps, 1)
+            self.current_step = output['progress']
         else:
-            return round((output['progress'] + self.job_data['base_steps'])*100/ total_steps, 1)
+            self.current_step = output['progress'] + self.job_data['base_steps']
+        return round(self.current_step*100/ self.total_steps)
+
+
+    def get_preview_steps(self):
+        def alpha(x):
+            return math.log(0.5*x)
+        norm_factor = self.total_steps/alpha(self.total_steps)
+        preview_steps = set([round(norm_factor*alpha(step+1)) for step in range(self.total_steps)])
+        preview_steps.add(1)
+
+        return preview_steps
+                
+
 
 
 def load_flags():
@@ -134,7 +156,6 @@ def main():
             callback.process_output({'error': f'{exc}\nChange parameters and try again'}, True)
             continue
         except torch.cuda.OutOfMemoryError as exc:
-            print('OOM')
             callback.process_output({'error': f'{exc}\nReduce num_samples and try again'}, True)
             continue
         

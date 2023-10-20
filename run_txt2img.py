@@ -12,7 +12,7 @@ from api_worker_interface import APIWorkerInterface, ProgressCallback
 
 WORKER_JOB_TYPE = "stable_diffusion_xl_txt2img"
 WORKER_AUTH_KEY = "5b07e305b50505ca2b3284b4ae5f65d7"
-
+SEND_LESS_PREVIEWS = False
 
 class ProcessOutputCallback():
     def __init__(self, api_worker, decode_first_stage):
@@ -31,19 +31,21 @@ class ProcessOutputCallback():
         else:
             images = output.pop('images')
             if not finished:
-                progress = self.calculate_progress(output)
-                preview_steps = self.get_preview_steps()
-                if self.job_data.get('provide_progress_images') == 'None' or self.current_step not in preview_steps:
-                    return self.api_worker.send_progress(self.job_data, progress, None)
+                if self.api_worker.progress_data_received:
+                    self.api_worker.progress_data_received = False
+                    progress = self.calculate_progress(output)
+                    preview_steps = self.get_preview_steps()
+                    if self.job_data.get('provide_progress_images') == 'None' or self.current_step not in preview_steps:
+                        return self.api_worker.send_progress(self.job_data, progress, None)
 
-                elif self.job_data.get('provide_progress_images') == 'decoded':
-                    images = self.decode_first_stage(images)
+                    elif self.job_data.get('provide_progress_images') == 'decoded':
+                        images = self.decode_first_stage(images)
 
-                images = torch.clamp((images + 1.0) / 2.0, min=0.0, max=1.0)
+                    images = torch.clamp((images + 1.0) / 2.0, min=0.0, max=1.0)
 
-                image_list = self.get_image_list(images)
-                output['progress_images'] = image_list
-                return self.api_worker.send_progress(self.job_data, progress, output)
+                    image_list = self.get_image_list(images)
+                    output['progress_images'] = image_list
+                    return self.api_worker.send_progress(self.job_data, progress, output)
 
             else:
                 images = self.decode_first_stage(images)
@@ -75,11 +77,15 @@ class ProcessOutputCallback():
 
 
     def get_preview_steps(self):
-        def alpha(x):
-            return math.log(0.5*x)
-        norm_factor = self.total_steps/alpha(self.total_steps)
-        preview_steps = set([round(norm_factor*alpha(step+1)) for step in range(self.total_steps)])
-        preview_steps.add(1)
+        if SEND_LESS_PREVIEWS:
+            def alpha(x):
+                return math.log(0.5*x)
+            norm_factor = self.total_steps/alpha(self.total_steps)
+            preview_steps = set([round(norm_factor*alpha(step+1)) for step in range(self.total_steps)])
+            preview_steps.add(1)
+        else:
+            preview_steps = [step for step in range(self.total_steps)]
+
 
         return preview_steps
                 

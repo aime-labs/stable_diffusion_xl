@@ -109,8 +109,9 @@ def load_flags():
     return parser.parse_args()
 
 def set_seed(job_data):
-    seed = job_data.get('seed', 1234)
+    seed = job_data.get('seed', -1)
     if seed == -1:
+        random.seed(datetime.now().timestamp())
         seed = random.randint(1, 99999999)
         job_data['seed'] = seed
     torch.manual_seed(seed)

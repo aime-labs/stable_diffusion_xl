@@ -8,6 +8,8 @@ from PIL import Image, ExifTags
 import numpy as np
 import math
 import sys
+import datetime
+
 from api_worker_interface import APIWorkerInterface, ProgressCallback
 
 WORKER_JOB_TYPE = "stable_diffusion_xl_txt2img"
@@ -57,6 +59,7 @@ class ProcessOutputCallback():
                 self.api_worker.send_progress(self.job_data, 100, None)
                 return self.api_worker.send_job_results(self.job_data, output)
 
+
     def get_image_list(self, images):
         image_list = list()
         for image in images:
@@ -86,11 +89,8 @@ class ProcessOutputCallback():
         else:
             preview_steps = [step for step in range(self.total_steps)]
 
-
         return preview_steps
                 
-
-
 
 def load_flags():
     parser = argparse.ArgumentParser()
@@ -108,10 +108,11 @@ def load_flags():
                         )
     return parser.parse_args()
 
+
 def set_seed(job_data):
     seed = job_data.get('seed', -1)
     if seed == -1:
-        random.seed(datetime.now().timestamp())
+        random.seed(datetime.datetime.now().timestamp())
         seed = random.randint(1, 99999999)
         job_data['seed'] = seed
     torch.manual_seed(seed)
@@ -132,6 +133,7 @@ def main():
     args = load_flags()
     pipeline_base = SamplingPipeline(ModelArchitecture.SDXL_V1_BASE, use_fp16=args.use_fp16, compile=args.compile)
     pipeline_refiner = SamplingPipeline(ModelArchitecture.SDXL_V1_REFINER, use_fp16=args.use_fp16, compile=args.compile)
+    torch.cuda.set_device(args.gpu_id)
     api_worker = APIWorkerInterface(args.api_server, WORKER_JOB_TYPE, WORKER_AUTH_KEY, args.gpu_id, world_size=1, rank=0)
     callback = ProcessOutputCallback(api_worker, pipeline_base.model.decode_first_stage)
 
@@ -165,7 +167,6 @@ def main():
         except torch.cuda.OutOfMemoryError as exc:
             callback.process_output({'error': f'{exc}\nReduce num_samples and try again'}, True)
             continue
-        
 
 
 if __name__ == "__main__":

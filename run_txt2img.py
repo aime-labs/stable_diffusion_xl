@@ -73,9 +73,11 @@ class ProcessOutputCallback():
     def calculate_progress(self, output):
         self.total_steps = self.job_data['base_steps'] + max(int(self.job_data['img2img_strength'] * self.job_data['refine_steps']), 1) + 1
         if output['stage'] == 'base':
-            self.current_step = output['progress']
+            self.current_step = output.pop('progress')
         else:
-            self.current_step = output['progress'] + self.job_data['base_steps']
+            self.current_step = output.pop('progress') + self.job_data['base_steps']
+        output.pop('stage')
+
         return round(self.current_step*100/ self.total_steps)
 
 
@@ -134,7 +136,7 @@ def main():
     pipeline_base = SamplingPipeline(ModelArchitecture.SDXL_V1_BASE, use_fp16=args.use_fp16, compile=args.compile)
     pipeline_refiner = SamplingPipeline(ModelArchitecture.SDXL_V1_REFINER, use_fp16=args.use_fp16, compile=args.compile)
     torch.cuda.set_device(args.gpu_id)
-    api_worker = APIWorkerInterface(args.api_server, WORKER_JOB_TYPE, WORKER_AUTH_KEY, args.gpu_id, world_size=1, rank=0)
+    api_worker = APIWorkerInterface(args.api_server, WORKER_JOB_TYPE, WORKER_AUTH_KEY, args.gpu_id, world_size=1, rank=0, gpu_name=torch.cuda.get_device_name())
     callback = ProcessOutputCallback(api_worker, pipeline_base.model.decode_first_stage)
 
     while True:

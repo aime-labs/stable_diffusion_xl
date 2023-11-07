@@ -10,7 +10,7 @@ import math
 import sys
 import datetime
 
-from api_worker_interface import APIWorkerInterface, ProgressCallback
+from api_worker_interface import APIWorkerInterface
 
 WORKER_JOB_TYPE = "stable_diffusion_xl_txt2img"
 WORKER_AUTH_KEY = "5b07e305b50505ca2b3284b4ae5f65d7"
@@ -26,19 +26,19 @@ class ProcessOutputCallback():
 
 
     def process_output(self, output, finished):
+        #self.api_worker.current_job_data = self.job_data
         list_images = list()
         if output.get('images') is None:
             output['images'] = [Image.fromarray((np.random.rand(1024,1024,3) * 255).astype(np.uint8))]
-            return self.api_worker.send_job_results(self.job_data, output)
+            return self.api_worker.send_job_results(output, self.job_data)
         else:
             images = output.pop('images')
             if not finished:
                 if self.api_worker.progress_data_received:
-                    self.api_worker.progress_data_received = False
                     progress = self.calculate_progress(output)
                     preview_steps = self.get_preview_steps()
                     if self.job_data.get('provide_progress_images') == 'None' or self.current_step not in preview_steps:
-                        return self.api_worker.send_progress(self.job_data, progress, None)
+                        return self.api_worker.send_progress(progress, None)
 
                     elif self.job_data.get('provide_progress_images') == 'decoded':
                         images = self.decode_first_stage(images)
@@ -47,7 +47,7 @@ class ProcessOutputCallback():
 
                     image_list = self.get_image_list(images)
                     output['progress_images'] = image_list
-                    return self.api_worker.send_progress(self.job_data, progress, output)
+                    return self.api_worker.send_progress(progress, output)
 
             else:
                 images = self.decode_first_stage(images)
@@ -56,8 +56,8 @@ class ProcessOutputCallback():
                 image_list = self.get_image_list(images)
 
                 output['images'] = image_list
-                self.api_worker.send_progress(self.job_data, 100, None)
-                return self.api_worker.send_job_results(self.job_data, output)
+                self.api_worker.send_progress(100, None)
+                return self.api_worker.send_job_results(output, self.job_data)
 
 
     def get_image_list(self, images):
@@ -112,14 +112,15 @@ def load_flags():
 
 
 def set_seed(job_data):
+    
     seed = job_data.get('seed', -1)
     if seed == -1:
         random.seed(datetime.datetime.now().timestamp())
         seed = random.randint(1, 99999999)
-        job_data['seed'] = seed
     torch.manual_seed(seed)
     random.seed(seed)
     np.random.seed(seed)
+    job_data['seed'] = seed
     return job_data
 
 
@@ -133,16 +134,18 @@ def get_sampling_parameters(job_data, stage):
 
 def main():
     args = load_flags()
-    pipeline_base = SamplingPipeline(ModelArchitecture.SDXL_V1_BASE, use_fp16=args.use_fp16, compile=args.compile)
-    pipeline_refiner = SamplingPipeline(ModelArchitecture.SDXL_V1_REFINER, use_fp16=args.use_fp16, compile=args.compile)
     torch.cuda.set_device(args.gpu_id)
     api_worker = APIWorkerInterface(args.api_server, WORKER_JOB_TYPE, WORKER_AUTH_KEY, args.gpu_id, world_size=1, rank=0, gpu_name=torch.cuda.get_device_name())
+    pipeline_base = SamplingPipeline(ModelArchitecture.SDXL_V1_BASE, use_fp16=args.use_fp16, compile=args.compile)
+    pipeline_refiner = SamplingPipeline(ModelArchitecture.SDXL_V1_REFINER, use_fp16=args.use_fp16, compile=args.compile)
+    
     callback = ProcessOutputCallback(api_worker, pipeline_base.model.decode_first_stage)
 
     while True:
         try:
             job_data = api_worker.job_request()
             job_data = set_seed(job_data)
+            
             callback.job_data = job_data           
             
             samples = pipeline_base.text_to_image(
@@ -160,7 +163,6 @@ def main():
                         samples = job_data['num_samples'],
                         progress_callback = callback.process_output
                     )
-            
             callback.process_output({'images': samples}, True)
 
         except ValueError as exc:

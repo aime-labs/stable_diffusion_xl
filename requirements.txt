@@ -36,5 +36,5 @@ wandb>=0.15.6
 webdataset>=0.2.33
 wheel>=0.41.0
 xformers>=0.0.20
-api_worker_interface @ git+https://github.com//aime-labs/api_worker_interface
+aime_api_worker_interface @ git+https://github.com//aime-team/aime-api-worker-interface
 .

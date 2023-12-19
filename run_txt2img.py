@@ -10,7 +10,7 @@ import math
 import sys
 import datetime
 
-from api_worker_interface import APIWorkerInterface
+from aime_api_worker_interface import APIWorkerInterface
 
 WORKER_JOB_TYPE = "stable_diffusion_xl_txt2img"
 WORKER_AUTH_KEY = "5b07e305b50505ca2b3284b4ae5f65d7"

@@ -26,11 +26,10 @@ class ProcessOutputCallback():
 
 
     def process_output(self, output, finished):
-        #self.api_worker.current_job_data = self.job_data
         list_images = list()
         if output.get('images') is None:
             output['images'] = [Image.fromarray((np.random.rand(1024,1024,3) * 255).astype(np.uint8))]
-            return self.api_worker.send_job_results(output, self.job_data)
+            return self.api_worker.send_job_results(output)
         else:
             images = output.pop('images')
             if not finished:
@@ -57,7 +56,7 @@ class ProcessOutputCallback():
 
                 output['images'] = image_list
                 self.api_worker.send_progress(100, None)
-                return self.api_worker.send_job_results(output, self.job_data)
+                return self.api_worker.send_job_results(output)
 
 
     def get_image_list(self, images):
@@ -97,7 +96,7 @@ class ProcessOutputCallback():
 def load_flags():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--api_server", type=str, default="http://0.0.0.0:7777", help="Address of the API server"
+        "--api_server", type=str, default="http://0.0.0.0:7777", help="Address of the AIME API server"
                         )
     parser.add_argument(
         "--gpu_id", type=int, default=0, required=False, help="ID of the GPU to be used"

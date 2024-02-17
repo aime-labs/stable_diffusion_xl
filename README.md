@@ -83,17 +83,16 @@ mlc-open sdxl
 cd stable_diffusion_xl
 streamlit run sampling.py
 ```
-If command streamlit not found, run:
+In case the streamlit command not found add it to the PATH with:
 ```shell
 export PATH="$HOME/.local/bin:$PATH"
-
 ```
 
-### Run txt2img inference in AIME MLC with AIME_ML_API
+### Run txt2img inference in AIME MLC as AIME API worker
 ```shell
 mlc-open sdxl
 cd stable_diffusion_xl
-python3 run_txt2img.py
+python3 run_txt2img.py --api_server <url to API server> [--use_fp16] [--compile]
 ```
 
 #### Install `sdata` for training

@@ -14,6 +14,7 @@ from aime_api_worker_interface import APIWorkerInterface
 
 WORKER_JOB_TYPE = "stable_diffusion_xl_txt2img"
 WORKER_AUTH_KEY = "5b07e305b50505ca2b3284b4ae5f65d7"
+VERSION = 0
 SEND_LESS_PREVIEWS = False
 
 class ProcessOutputCallback():
@@ -37,7 +38,7 @@ class ProcessOutputCallback():
                     progress = self.calculate_progress(output)
                     preview_steps = self.get_preview_steps()
                     if self.job_data.get('provide_progress_images') == 'None' or self.current_step not in preview_steps:
-                        return self.api_worker.send_progress(progress, None)
+                        return self.api_worker.send_progress(progress)
 
                     elif self.job_data.get('provide_progress_images') == 'decoded':
                         images = self.decode_first_stage(images)
@@ -46,6 +47,7 @@ class ProcessOutputCallback():
 
                     image_list = self.get_image_list(images)
                     output['progress_images'] = image_list
+                    
                     return self.api_worker.send_progress(progress, output)
 
             else:
@@ -91,7 +93,7 @@ class ProcessOutputCallback():
             preview_steps = [step for step in range(self.total_steps)]
 
         return preview_steps
-                
+
 
 def load_flags():
     parser = argparse.ArgumentParser()

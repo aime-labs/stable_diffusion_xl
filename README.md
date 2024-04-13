@@ -16,8 +16,10 @@
 - A technical report on SDXL is now available [here](https://arxiv.org/abs/2307.01952).
 
 
-## Installation:
+## Installation with [AIME MLC](https://github.com/aime-team/aime-ml-containers)
 <a name="installation"></a>
+
+Easy installation within an [AIME ML-Container](https://github.com/aime-team/aime-ml-containers).
 
 ### Clone the repo
 

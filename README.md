@@ -88,12 +88,17 @@ In case the streamlit command not found add it to the PATH with:
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-### Run txt2img inference in AIME MLC as AIME API worker
+### Run txt2img inference as HTTP/HTTPS API with AIME API Server
+
+To run Stable Diffusion XL as HTTP/HTTPS API with [AIME API Server](https://github.com/aime-team/aime-api-server) start the chat command with following command line:
+
 ```shell
 mlc-open sdxl
 cd stable_diffusion_xl
 python3 run_txt2img.py --api_server <url to API server> [--use_fp16] [--compile]
 ```
+
+It will start Stable Diffusion XL as worker, waiting for job request through the AIME API Server.
 
 #### Install `sdata` for training
 

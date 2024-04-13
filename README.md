@@ -16,26 +16,20 @@
 - A technical report on SDXL is now available [here](https://arxiv.org/abs/2307.01952).
 
 
-## The codebase
-
-### General Philosophy
-
-Modularity is king. This repo implements a config-driven approach where we build and combine submodules by calling `instantiate_from_config()` on objects defined in yaml configs. See `configs/` for many examples.
-
 ## Installation:
 <a name="installation"></a>
 
-#### Clone the repo
+### Clone the repo
 
 ```shell
 git clone https://github.com/aime-labs/stable_diffusion_xl
 
 ```
-#### Setting up AIME MLC
+### Setting up AIME MLC
 ```shell
 mlc-create sdxl Pytorch 2.0.1-aime
 ```
-#### Install packages in AIME MLC
+### Install packages in AIME MLC
 ```shell
 mlc-open sdxl
 sudo apt-get install libglib2.0-0 libgl1
@@ -43,7 +37,7 @@ cd stable_diffusion_xl
 pip3 install -r requirements.txt
 
 ```
-#### Setup weigths
+### Setup weigths
 ```shell
 sudo apt-get install git-lfs
 git lfs install

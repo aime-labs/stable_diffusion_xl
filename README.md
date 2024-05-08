@@ -15,52 +15,23 @@
 **July 4, 2023**
 - A technical report on SDXL is now available [here](https://arxiv.org/abs/2307.01952).
 
-**June 22, 2023**
 
-
-- We are releasing two new diffusion models for research purposes:
-  - `SDXL-base-0.9`: The base model was trained on a variety of aspect ratios on images with resolution 1024^2. The base model uses [OpenCLIP-ViT/G](https://github.com/mlfoundations/open_clip) and [CLIP-ViT/L](https://github.com/openai/CLIP/tree/main) for text encoding whereas the refiner model only uses the OpenCLIP model.
-  - `SDXL-refiner-0.9`: The refiner has been trained to denoise small noise levels of high quality data and as such is not expected to work as a text-to-image model; instead, it should only be used as an image-to-image model.
-
-If you would like to access these models for your research, please apply using one of the following links:
-[SDXL-0.9-Base model](https://huggingface.co/stabilityai/stable-diffusion-xl-base-0.9), and [SDXL-0.9-Refiner](https://huggingface.co/stabilityai/stable-diffusion-xl-refiner-0.9).
-This means that you can apply for any of the two links - and if you are granted - you can access both.
-Please log in to your Hugging Face Account with your organization email to request access.
-**We plan to do a full release soon (July).**
-
-## The codebase
-
-### General Philosophy
-
-Modularity is king. This repo implements a config-driven approach where we build and combine submodules by calling `instantiate_from_config()` on objects defined in yaml configs. See `configs/` for many examples.
-
-### Changelog from the old `ldm` codebase
-
-For training, we use [PyTorch Lightning](https://lightning.ai/docs/pytorch/stable/), but it should be easy to use other training wrappers around the base modules. The core diffusion model class (formerly `LatentDiffusion`, now `DiffusionEngine`) has been cleaned up:
-
-- No more extensive subclassing! We now handle all types of conditioning inputs (vectors, sequences and spatial conditionings, and all combinations thereof) in a single class: `GeneralConditioner`, see `sgm/modules/encoders/modules.py`.
-- We separate guiders (such as classifier-free guidance, see `sgm/modules/diffusionmodules/guiders.py`) from the
-  samplers (`sgm/modules/diffusionmodules/sampling.py`), and the samplers are independent of the model.
-- We adopt the ["denoiser framework"](https://arxiv.org/abs/2206.00364) for both training and inference (most notable change is probably now the option to train continuous time models):
-    * Discrete times models (denoisers) are simply a special case of continuous time models (denoisers); see `sgm/modules/diffusionmodules/denoiser.py`.
-    * The following features are now independent: weighting of the diffusion loss function (`sgm/modules/diffusionmodules/denoiser_weighting.py`), preconditioning of the network (`sgm/modules/diffusionmodules/denoiser_scaling.py`), and sampling of noise levels during training (`sgm/modules/diffusionmodules/sigma_sampling.py`).
-- Autoencoding models have also been cleaned up.
-
-## Installation:
+## Installation with [AIME MLC](https://github.com/aime-team/aime-ml-containers)
 <a name="installation"></a>
 
-#### Clone the repo
+Easy installation within an [AIME ML-Container](https://github.com/aime-team/aime-ml-containers).
+
+### Clone the repo
 
 ```shell
 git clone https://github.com/aime-labs/stable_diffusion_xl
 
 ```
-
-#### Setting up AIME MLC
+### Setting up AIME MLC
 ```shell
 mlc-create sdxl Pytorch 2.0.1-aime
 ```
-#### Install packages in AIME MLC
+### Install packages in AIME MLC
 ```shell
 mlc-open sdxl
 sudo apt-get install libglib2.0-0 libgl1
@@ -68,7 +39,7 @@ cd stable_diffusion_xl
 pip3 install -r requirements.txt
 
 ```
-#### Setup weigths
+### Setup weigths
 ```shell
 sudo apt-get install git-lfs
 git lfs install
@@ -88,18 +59,18 @@ In case the streamlit command not found add it to the PATH with:
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-### Run txt2img inference in AIME MLC as AIME API worker
+### Run txt2img inference as HTTP/HTTPS API with AIME API Server
+
+To run Stable Diffusion XL as HTTP/HTTPS API with [AIME API Server](https://github.com/aime-team/aime-api-server) start the chat command with following command line:
+
 ```shell
 mlc-open sdxl
 cd stable_diffusion_xl
 python3 run_txt2img.py --api_server <url to API server> [--use_fp16] [--compile]
 ```
 
-#### Install `sdata` for training
+It will start Stable Diffusion XL as worker, waiting for job request through the AIME API Server.
 
-```shell
-pip3 install -e git+https://github.com/Stability-AI/datapipelines.git@main#egg=sdata
-```
 
 ## Packaging
 

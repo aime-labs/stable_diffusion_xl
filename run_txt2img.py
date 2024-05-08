@@ -13,7 +13,7 @@ import datetime
 from aime_api_worker_interface import APIWorkerInterface
 
 WORKER_JOB_TYPE = "stable_diffusion_xl_txt2img"
-WORKER_AUTH_KEY = "5b07e305b50505ca2b3284b4ae5f65d7"
+DEFAULT_WORKER_AUTH_KEY = "5b07e305b50505ca2b3284b4ae5f65d7"
 VERSION = 0
 SEND_LESS_PREVIEWS = False
 
@@ -109,6 +109,11 @@ def load_flags():
     parser.add_argument(
         "--compile", action='store_true', help="Use torch.compile(model) from Pytorch 2"
                         )
+    parser.add_argument(
+        "--auth_key", type=str , default=DEFAULT_WORKER_AUTH_KEY, required=False, 
+        help="Worker auth key",
+    )
+
     return parser.parse_args()
 
 
@@ -136,7 +141,7 @@ def get_sampling_parameters(job_data, stage):
 def main():
     args = load_flags()
     torch.cuda.set_device(args.gpu_id)
-    api_worker = APIWorkerInterface(args.api_server, WORKER_JOB_TYPE, WORKER_AUTH_KEY, args.gpu_id, world_size=1, rank=0, gpu_name=torch.cuda.get_device_name())
+    api_worker = APIWorkerInterface(args.api_server, WORKER_JOB_TYPE, args.auth_key, args.gpu_id, world_size=1, rank=0, gpu_name=torch.cuda.get_device_name())
     pipeline_base = SamplingPipeline(ModelArchitecture.SDXL_V1_BASE, use_fp16=args.use_fp16, compile=args.compile)
     pipeline_refiner = SamplingPipeline(ModelArchitecture.SDXL_V1_REFINER, use_fp16=args.use_fp16, compile=args.compile)
     
